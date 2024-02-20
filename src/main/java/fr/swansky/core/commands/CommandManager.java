@@ -18,7 +18,6 @@ import java.util.logging.Logger;
 public class CommandManager extends ListenerAdapter {
 
     private static final List<Class<?>> INTERNAL_SUPPORTED_CLASS = List.of(SlashCommandInteractionEvent.class, CommandManager.class);
-
     private static final Logger LOGGER = Logger.getLogger("CommandManager");
 
     private final Map<String, SimpleCommand> commandDataMap = new HashMap<>();
@@ -106,9 +105,9 @@ public class CommandManager extends ListenerAdapter {
                     return;
                 }
                 SimpleSubCommand subCommand = subCommandOptional.get();
-                subCommand.getMethod().invoke(simpleCommand.getInstance(), createParams(subCommand.getMethod(), event));
+                subCommand.getMethod().invoke(simpleCommand.getInstance(), createParamsList(subCommand.getMethod(), event));
             } else {
-                simpleCommand.getMainCommand().invoke(simpleCommand.getInstance(), createParams(simpleCommand.getMainCommand(), event));
+                simpleCommand.getMainCommand().invoke(simpleCommand.getInstance(), createParamsList(simpleCommand.getMainCommand(), event));
             }
         } catch (Exception e) {
             event.getHook().sendMessage("An error occurred while executing the command").queue();
@@ -116,7 +115,7 @@ public class CommandManager extends ListenerAdapter {
         }
     }
 
-    private Object[] createParams(Method method, SlashCommandInteractionEvent event) {
+    private Object[] createParamsList(Method method, SlashCommandInteractionEvent event) {
         Object[] params = new Object[method.getParameterCount()];
         for (int i = 0; i < method.getParameters().length; i++) {
             Parameter parameter = method.getParameters()[i];
@@ -128,23 +127,26 @@ public class CommandManager extends ListenerAdapter {
                 }
                 params[i] = CommandUtils.getOptionValue(option, parameter.getType());
             } else {
-                if (INTERNAL_SUPPORTED_CLASS.contains(parameter.getType())) {
-                    if (parameter.getType().equals(SlashCommandInteractionEvent.class)) {
-                        params[i] = event;
-                    } else if (parameter.getType().equals(CommandManager.class)) {
-                        params[i] = this;
-                    } else {
-                        throw new IllegalArgumentException("Unsupported type " + parameter.getType().getName());
-
-                    }
-                } else if (providers.containsKey(parameter.getType())) {
-                    params[i] = providers.get(parameter.getType());
-                } else {
-                    throw new IllegalArgumentException("No provider found for " + parameter.getType().getName());
-                }
+                addInstanceOfNoParam(event, parameter, params, i);
             }
         }
         return params;
+    }
+
+    private void addInstanceOfNoParam(SlashCommandInteractionEvent event, Parameter parameter, Object[] params, int i) {
+        if (INTERNAL_SUPPORTED_CLASS.contains(parameter.getType())) {
+            if (parameter.getType().equals(SlashCommandInteractionEvent.class)) {
+                params[i] = event;
+            } else if (parameter.getType().equals(CommandManager.class)) {
+                params[i] = this;
+            } else {
+                throw new IllegalArgumentException("Unsupported type " + parameter.getType().getName());
+            }
+        } else if (providers.containsKey(parameter.getType())) {
+            params[i] = providers.get(parameter.getType());
+        } else {
+            throw new IllegalArgumentException("No provider found for " + parameter.getType().getName());
+        }
     }
 
     private boolean memberCanExecuteCommand(Member member, SimpleCommand simpleCommand) {
