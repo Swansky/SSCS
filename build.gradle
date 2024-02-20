@@ -1,0 +1,37 @@
+plugins {
+    id 'java'
+    id 'com.github.johnrengelman.shadow' version '8.1.1'
+    id 'maven-publish'
+}
+
+group = 'fr.swansky'
+version = '1.0.0'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    testImplementation platform('org.junit:junit-bom:5.9.1')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    implementation 'net.dv8tion:JDA:5.0.0-beta.20'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+shadowJar {
+    archiveBaseName.set(rootProject.name)
+    archiveClassifier.set('')
+
+}
+
+publishing {
+    publications {
+        shadow(MavenPublication) {
+            //from components.java
+            artifact shadowJar
+        }
+    }
+}
