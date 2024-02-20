@@ -100,6 +100,7 @@ Parameters:
 If you need to provide an instance to a command you can use the `addProvider` method in the `CommandManagerBuilder`
 class.
 And add a parameter to the command method with the type of the instance you want to provide.
+If parameter don't have a `@Param` annotation, an instance will be provided from internal providers or from added providers.
 #### By default
 
 By default, the command manager can provide the following instances:
