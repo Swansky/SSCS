@@ -1,6 +1,7 @@
 plugins {
-    id 'java'
+    id 'java-library'
     id 'maven-publish'
+    id 'org.jreleaser' version '1.14.0'
 }
 
 group = 'fr.swansky'
@@ -8,6 +9,11 @@ version = '1.1.0'
 
 repositories {
     mavenCentral()
+}
+
+java {
+    withJavadocJar()
+    withSourcesJar()
 }
 
 dependencies {
@@ -21,24 +27,55 @@ test {
     useJUnitPlatform()
 }
 
+
+jreleaser {
+    signing {
+        active = 'ALWAYS'
+        armored = true
+    }
+    deploy {
+
+        maven {
+            /*nexus2 {
+                'maven-central' {
+                    active = 'ALWAYS'
+                    url = 'https://s01.oss.sonatype.org/service/local'
+                    snapshotUrl = 'https://s01.oss.sonatype.org/content/repositories/snapshots/'
+                    closeRepository = true
+                    releaseRepository = true
+                    stagingRepository('build/staging-deploy')
+                }
+            }*/
+            //Portal Publisher API
+            mavenCentral {
+                sonatype {
+                    active = 'ALWAYS'
+                    url = 'https://central.sonatype.com/api/v1/publisher'
+                    stagingRepository('build/staging-deploy')
+                }
+            }
+
+        }
+    }
+}
+
 publishing {
     repositories {
         maven {
-            name = "GitHubPackages"
-            url = uri("https://maven.pkg.github.com/swansky/sscs")
-            credentials {
-                username = project.findProperty("github.name") ?: System.getenv("GITHUB_ACTOR")
-                password = project.findProperty("github.token") ?: System.getenv("PUB_GITHUB_TOKEN")
-            }
+            url = layout.buildDirectory.dir('staging-deploy')
         }
     }
     publications {
-        mavenPublish(MavenPublication) {
-            from(components.java)
+        mavenJava(MavenPublication) {
+            groupId = 'fr.swansky'
+            artifactId = 'sscs'
+
+            from components.java
             pom {
                 name = 'Simple Slash Command System'
                 description = 'A library to implement slash commands for Discord bots using annotations and parameter auto-injection.'
                 url = 'https://github.com/Swansky/SSCS'
+                inceptionYear = '2023'
                 licenses {
                     license {
                         name = 'MIT License'
@@ -53,13 +90,12 @@ publishing {
                     }
                 }
                 scm {
-                    connection = 'scm:git:git://github.com/Swansky/SSCS.git'
+                    connection = 'scm:git:https://github.com/Swansky/SSCS.git'
                     developerConnection = 'scm:git:ssh://github.com/Swansky/SSCS.git'
-                    url = 'https://github.com/swansky/sscs'
+                    url = 'https://github.com/swansky/SSCS'
                 }
             }
         }
     }
-
 }
 
