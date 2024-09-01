@@ -39,3 +39,9 @@ jobs:
 
       - name: Run unit tests
         run: ./gradlew test
+
+      - name: Publish artifact to GitHub Packages
+        if: github.ref == 'refs/heads/main'
+        run: ./gradlew publish
+        env:
+          GITHUB_TOKEN: ${{ secrets.PUB_GITHUB_TOKEN }}

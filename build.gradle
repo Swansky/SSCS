@@ -31,8 +31,42 @@ shadowJar {
 publishing {
     publications {
         shadow(MavenPublication) {
-            //from components.java
             artifact shadowJar
+
+            pom {
+                name = 'Simple Slash Command System'
+                description = 'A library to implement slash commands for Discord bots using annotations and parameter auto-injection.'
+                url = 'https://github.com/Swansky/SSCS'
+                licenses {
+                    license {
+                        name = 'MIT License'
+                        url = 'https://opensource.org/licenses/MIT'
+                    }
+                }
+                developers {
+                    developer {
+                        id = 'Swansky'
+                        name = 'Swansky'
+                        email = 'pro@swansky.fr'
+                    }
+                }
+                scm {
+                    connection = 'scm:git:git://github.com/Swansky/SSCS.git'
+                    developerConnection = 'scm:git:ssh://github.com/Swansky/SSCS.git'
+                    url = 'https://github.com/Swansky/SSCS'
+                }
+            }
+        }
+    }
+    repositories {
+        maven {
+            name = "GitHubPackages"
+            url = uri("https://maven.pkg.github.com/Swansky/SSCS")
+            credentials {
+                username = project.findProperty("gpr.user") ?: System.getenv("GITHUB_ACTOR")
+                password = project.findProperty("gpr.token") ?: System.getenv("PUB_GITHUB_TOKEN")
+            }
         }
     }
 }
+
