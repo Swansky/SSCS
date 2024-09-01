@@ -3,7 +3,6 @@ package commands.command;
 
 import fr.swansky.core.commands.Command;
 import fr.swansky.core.commands.MainCommand;
-
 import fr.swansky.core.commands.SubCommand;
 
 @Command(name = "badParam", description = "Bad Param Command")

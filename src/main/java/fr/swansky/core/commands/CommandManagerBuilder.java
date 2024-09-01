@@ -1,5 +1,7 @@
 package fr.swansky.core.commands;
 
+import fr.swansky.core.commands.providers.ParamProvider;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -9,7 +11,7 @@ public class CommandManagerBuilder {
 
     private final List<Object> commands = new ArrayList<>();
 
-    private final Map<Class<?>, Object> providers = new HashMap<>();
+    private final Map<Class<?>, ParamProvider<?>> providers = new HashMap<>();
 
     private CommandManagerBuilder() {
     }
@@ -23,8 +25,8 @@ public class CommandManagerBuilder {
         return this;
     }
 
-    public CommandManagerBuilder addProvider(Class<?> providerClass, Object providers) {
-        this.providers.put(providerClass, providers);
+    public <T> CommandManagerBuilder addProvider(Class<T> providerClass, ParamProvider<T> provider) {
+        this.providers.put(providerClass, provider);
         return this;
     }
 

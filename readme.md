@@ -1,26 +1,45 @@
-# Simple Slash Command System
+## Simple Slash Command System (SSCS)
 
-This is a simple command system for discord slash command for [JDA](https://github.com/discord-jda/JDA) libs. It is
-designed to be easy to use and easy to understand. It is also designed to be easy to expand upon.
+SSCS is a library designed to make it easy to implement slash commands on your [JDA](https://github.com/discord-jda/JDA)
+Discord bot. This library uses annotations and auto-injection of parameters. The annotated methods are automatically
+called by the core system when a command is invoked.
 
-## Features
+### Features
 
-- [Possible to provide instances to commands ](#providers)
-- _Custom converters_ (not implemented yet)
+- ✅ **Supports default types**
+- ✅ **Supports custom types**
+- ✅ **Supports auto-completion**
+- ✅ **Supports commands with and without arguments**
+- ❌ **Supports ContextMenu**: *In Progress* ⏳
+- ❌ **Supports annotation for provided param**: *In Progress* ⏳
+- ❌ **Supports auto-completion for built-in param**: *In Progress* ⏳
+- ❌ **Supports dynamic permission**: *In Progress* ⏳
 
-## Usage
 
-### Create command manager and register it
+
+### Requirements
+
+To use this project, ensure you have the following dependencies and tools installed:
+
+- **Java 21**
+- **JDA 5.0.0**
+- **Gradle 8**
+
+### Initialization
 
 ```java
 public class Main {
     public static void main(String[] args) {
-        JDA jda = JDABuilder.createDefault("token")
-                .addEventListeners(CommandManagerBuilder.create()
-                        .addCommands(new MyCommand())
-                        .addProvider(InstanceToProvide.class, new InstanceToProvide())
-                        .build())
+        CommandManager commandManager = CommandManagerBuilder.create()
+                .addCommands(new MyCommand())
+                .addProvider(InstanceToProvide.class, new InstanceProvider())
                 .build();
+
+        JDA jda = JDABuilder.createDefault("token")
+                .addEventListeners(commandManager)
+                .build();
+
+        commandManager.registerCommands(jda);
     }
 }
 ```
@@ -95,19 +114,6 @@ Parameters:
 - `required` - If the parameter is required (default: true)
 - `defaultValue` - The default value of the parameter (default: "")
 
-### Providers
-
-If you need to provide an instance to a command you can use the `addProvider` method in the `CommandManagerBuilder`
-class.
-And add a parameter to the command method with the type of the instance you want to provide.
-If parameter don't have a `@Param` annotation, an instance will be provided from internal providers or from added providers.
-#### By default
-
-By default, the command manager can provide the following instances:
-
-- CommandManager
-- SlashCommandInteractionEvent
-
 #### Example
 
 ```java
@@ -126,10 +132,153 @@ public class MyCommand {
                       @Param(name = "count") int count,
                       @Param(name = "message") String message,
                       @Param(name = "channel") TextChannel channel,
-                      InstanceToProvide instanceToProvide) { // instanceToProvide will be provided if it is registered in the CommandManager (addProvider)
+                      InstanceToProvide instanceToProvide) {
         for (int i = 0; i < count; i++) {
             channel.sendMessage(user.getAsMention() + " " + message).queue();
         }
     }
 }
 ```
+
+### Providers
+
+If you want to pass a custom type as a parameter to a method/command, whether it needs to be prompted from the user,
+this is possible using `ParamProvider`.
+
+#### Example: DateProvider (built-in provider)
+
+```java
+import java.text.DateFormat;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+
+public class DateProvider implements ParamProvider<Date> {
+    public static final DateProvider INSTANCE = new DateProvider("dd/MM/yyyy");
+
+    private final DateFormat dateFormat;
+
+    public DateProvider(String format) {
+        dateFormat = new SimpleDateFormat(format);
+    }
+
+    @Override
+    public Date get(OptionMapping mapping, SlashCommandInteractionEvent event) throws ParamException {
+        String stringDate = mapping.getAsString();
+        try {
+            return dateFormat.parse(stringDate);
+        } catch (ParseException e) {
+            throw new ParamException("Wrong date value");
+        }
+    }
+
+    @Override
+    public OptionType getOptionType() {
+        return OptionType.STRING;
+    }
+}
+```
+
+### Usage Example
+
+```java
+
+@SubCommand(name = "date", description = "enter date")
+public void enterDate(SlashCommandInteractionEvent event, @Param(name = "date") Date startDate) {
+    // do something...
+}
+```
+
+### Auto-Completion
+
+SSCS supports auto-completion for custom types, allowing you to provide suggestions to the user as they type. This is
+handled using the `onAutoComplete` method within a `ParamProvider`.
+
+#### Example: CustomObjectProvider
+
+```java
+import net.dv8tion.jda.api.events.interaction.command.CommandAutoCompleteInteractionEvent;
+import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
+import net.dv8tion.jda.api.interactions.commands.OptionMapping;
+import net.dv8tion.jda.api.interactions.commands.OptionType;
+
+import java.util.List;
+
+public class CustomObjectProvider implements ParamProvider<MyCustomObject> {
+    private final List<MyCustomObject> availableObjects;
+
+    public CustomObjectProvider(List<MyCustomObject> availableObjects) {
+        this.availableObjects = availableObjects;
+    }
+
+    @Override
+    public MyCustomObject get(OptionMapping optionMapping, SlashCommandInteractionEvent event) throws ParamException {
+        String id = optionMapping.getAsString();
+        return availableObjects.stream()
+                .filter(obj -> obj.getId().equals(id))
+                .findFirst()
+                .orElseThrow(() -> new ParamException("Invalid ID: " + id));
+    }
+
+    @Override
+    public OptionType getOptionType() {
+        return OptionType.STRING;
+    }
+
+    @Override
+    public void onAutoComplete(CommandAutoCompleteInteractionEvent event) {
+        String input = event.getFocusedOption().getValue();
+        List<String> matchingIds = availableObjects.stream()
+                .map(MyCustomObject::getId)
+                .filter(id -> id.startsWith(input))
+                .toList();
+        event.replyChoiceStrings(matchingIds).queue();
+    }
+
+    @Override
+    public boolean isAutoComplete() {
+        return true;
+    }
+}
+```
+
+#### Custom Object Definition
+
+```java
+public class MyCustomObject {
+    private final String id;
+    private final String name;
+
+    public MyCustomObject(String id, String name) {
+        this.id = id;
+        this.name = name;
+    }
+
+    public String getId() {
+        return id;
+    }
+
+    public String getName() {
+        return name;
+    }
+}
+```
+
+#### Usage Example
+
+```java
+
+@SubCommand(name = "select-object", description = "Select a custom object by ID")
+public void selectCustomObject(SlashCommandInteractionEvent event, @Param(name = "object_id") MyCustomObject selectedObject) {
+    // Handle the selected object...
+}
+```
+
+### Project Purpose and Updates
+
+This project is developed primarily for personal and professional use. As such, updates and new features will be driven
+by the needs and requirements that arise in these contexts. While community feedback and contributions are welcome, the
+direction of the project will prioritize the features and improvements that align with my personal and professional use
+cases.
+
+

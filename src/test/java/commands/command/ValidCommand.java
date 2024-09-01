@@ -18,6 +18,7 @@ public class ValidCommand {
 
     @SubCommand(name = "sub", description = "Hello World Sub Command")
     public void helloWorldSub(SlashCommandInteractionEvent event, @Param(name = "count") int count, @Param(name = "name") String name, @Param(name = "channel") TextChannel channel) {
+        if (event == null) throw new IllegalArgumentException("SlashCommandInteractionEvent is null");
         event.getHook().sendMessage("Hello World Sub: " + count + " " + name).queue();
     }
 }

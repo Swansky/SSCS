@@ -2,6 +2,7 @@ package fr.swansky.core.commands;
 
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.interactions.commands.DefaultMemberPermissions;
+import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
 import net.dv8tion.jda.api.interactions.commands.build.SlashCommandData;
@@ -11,7 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-public class SimpleCommand {
+public class SimpleCommand implements BaseCommand {
 
     private final String name;
     private final String description;
@@ -85,10 +86,6 @@ public class SimpleCommand {
         perms.addAll(list);
     }
 
-    public void setMainCommand(Method method) {
-        this.mainCommand = method;
-    }
-
     public void addSubCommand(SimpleSubCommand simpleSubCommand) {
         subCommands.add(simpleSubCommand);
     }
@@ -103,5 +100,29 @@ public class SimpleCommand {
 
     public Optional<SimpleSubCommand> findSubCommand(String s) {
         return subCommands.stream().filter(simpleSubCommand -> simpleSubCommand.getName().equals(s)).findFirst();
+    }
+
+    public void addOption(Class<?> type, Param param, OptionType optionType, boolean autoComplete) {
+        options.add(new OptionData(optionType, param.name().toLowerCase(), param.description(), param.required(), autoComplete));
+    }
+
+    @Override
+    public void setMethod(Method method) {
+        mainCommand = method;
+    }
+
+    @Override
+    public String toString() {
+        return "SimpleCommand{" +
+                "name='" + name + '\'' +
+                ", description='" + description + '\'' +
+                ", guildOnly=" + guildOnly +
+                ", nsfw=" + nsfw +
+                ", perms=" + perms +
+                ", options=" + options +
+                ", subCommands=" + subCommands +
+                ", instance=" + instance +
+                ", mainCommand=" + mainCommand +
+                '}';
     }
 }

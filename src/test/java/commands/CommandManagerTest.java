@@ -4,16 +4,17 @@ import commands.command.BadCommand;
 import commands.command.BadParamCommand;
 import commands.command.ProviderCommand;
 import commands.command.ValidCommand;
+import fr.swansky.core.commands.CommandManager;
+import fr.swansky.core.commands.CommandManagerBuilder;
+import fr.swansky.core.commands.SimpleCommand;
+import fr.swansky.core.commands.exceptions.CommandException;
+import fr.swansky.core.commands.providers.ParamProvider;
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.SlashCommandData;
 import net.dv8tion.jda.api.interactions.commands.build.SubcommandData;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
-import fr.swansky.core.commands.CommandManager;
-import fr.swansky.core.commands.CommandManagerBuilder;
-import fr.swansky.core.commands.SimpleCommand;
-import fr.swansky.core.commands.exceptions.CommandException;
 
 import java.io.File;
 
@@ -66,12 +67,13 @@ class CommandManagerTest {
 
     }
 
-
     @Test
     @Order(2)
     void provider() {
         File file = new File("test");
-        CommandManager validCM = CommandManagerBuilder.create().addCommands(new ProviderCommand()).addProvider(File.class, file).build();
+        CommandManager validCM = CommandManagerBuilder.create().addCommands(new ProviderCommand())
+                .addProvider(File.class, ParamProvider.staticProvider(file))
+                .build();
         assertEquals(1, validCM.getCommands().size());
     }
 
