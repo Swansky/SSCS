@@ -1,11 +1,11 @@
 package fr.swansky.core.commands.providers;
 
-import fr.swansky.core.commands.providers.channels.*;
 import fr.swansky.core.commands.providers.common.DateProvider;
 import fr.swansky.core.commands.providers.discord.AttachmentProvider;
 import fr.swansky.core.commands.providers.discord.MemberProvider;
 import fr.swansky.core.commands.providers.discord.RoleProvider;
 import fr.swansky.core.commands.providers.discord.UserProvider;
+import fr.swansky.core.commands.providers.discord.channels.*;
 import fr.swansky.core.commands.providers.primitivetypes.*;
 import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.User;
@@ -17,7 +17,7 @@ import java.util.Map;
 
 public class ProviderBuilder {
     private ProviderBuilder() {
-        throw new RuntimeException("Utility class");
+        throw new IllegalArgumentException("Utility class");
     }
 
     public static Map<Class<?>, ParamProvider<?>> getBuiltinProviders() {

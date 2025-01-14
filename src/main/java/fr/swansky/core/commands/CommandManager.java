@@ -4,7 +4,7 @@ import fr.swansky.core.commands.exceptions.CommandException;
 import fr.swansky.core.commands.providers.ParamProvider;
 import fr.swansky.core.commands.providers.ProviderBuilder;
 import net.dv8tion.jda.api.JDA;
-import net.dv8tion.jda.api.entities.Member;
+import net.dv8tion.jda.api.events.interaction.GenericInteractionCreateEvent;
 import net.dv8tion.jda.api.events.interaction.command.CommandAutoCompleteInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
@@ -27,20 +27,26 @@ public class CommandManager extends ListenerAdapter {
 
     private final Map<String, SimpleCommand> commandDataMap = new HashMap<>();
     private final Map<Class<?>, ParamProvider<?>> providers = new HashMap<>();
+    private final List<Middleware> middlewares = new ArrayList<>();
 
-    public CommandManager(List<Object> commands, Map<Class<?>, ParamProvider<?>> providers) {
+    public CommandManager(List<Object> commands, Map<Class<?>, ParamProvider<?>> providers, List<Middleware> middlewares) {
         this.providers.putAll(ProviderBuilder.getBuiltinProviders());
         this.providers.putAll(providers);
         this.providers.put(CommandManager.class, ParamProvider.staticProvider(this));
         this.providers.put(SlashCommandInteractionEvent.class, (arg, event) -> event);
 
+        this.middlewares.addAll(middlewares);
 
         for (Object command : commands) {
             addCommandToRegister(command);
         }
     }
 
-
+    /**
+     * Add a command to the register, this instance should have the annotation @Command with method also annotated with @MainCommand or @SubCommand
+     *
+     * @param obj the instance of the command
+     */
     public void addCommandToRegister(Object obj) {
         if (obj.getClass().isAnnotationPresent(Command.class)) {
             Command annotation = obj.getClass().getAnnotation(Command.class);
@@ -79,7 +85,7 @@ public class CommandManager extends ListenerAdapter {
                     throw new IllegalArgumentException("method %s have a parameter(%s) without valid provider"
                             .formatted(method.getName(), param.name()));
                 }
-                command.addOption(parameter.getType(), param, paramProvider.getOptionType(),paramProvider.isAutoComplete());
+                command.addOption(parameter.getType(), param, paramProvider.getOptionType(), paramProvider.isAutoComplete());
 
             } else {
                 if (!providers.containsKey(parameter.getType())) {
@@ -101,8 +107,14 @@ public class CommandManager extends ListenerAdapter {
         commandDataMap.put(simpleCommand.getName(), simpleCommand);
     }
 
+    /**
+     * This method should be called after all commands are registered with {@link #addCommandToRegister(Object)}.
+     * It will register all commands to the provided JDA instance.
+     *
+     * @param jda The JDA instance to register the commands to.
+     */
     public void registerCommands(JDA jda) {
-        LOGGER.info("Commands registered");
+        LOGGER.info("Command will be registered");
 
         List<SlashCommandData> list = commandDataMap.values().stream()
                 .map(SimpleCommand::createCommandData)
@@ -110,22 +122,20 @@ public class CommandManager extends ListenerAdapter {
 
         jda.updateCommands()
                 .addCommands(list)
-                .queue(commands -> {
-                    commands.forEach(command -> {
-                        List<String> subcommandName = command.getSubcommands()
-                                .stream()
-                                .map(net.dv8tion.jda.api.interactions.commands.Command.Subcommand::getName)
-                                .toList();
-                        String subCommand = String.format("(%s)",
-                                subcommandName.stream().reduce((s1, s2) -> s1 + ", " + s2).orElse("")
-                        );
-                        if (subcommandName.isEmpty()) {
-                            subCommand = "";
-                        }
+                .queue(commands -> commands.forEach(command -> {
+                    List<String> subcommandName = command.getSubcommands()
+                            .stream()
+                            .map(net.dv8tion.jda.api.interactions.commands.Command.Subcommand::getName)
+                            .toList();
+                    String subCommand = String.format("(%s)",
+                            subcommandName.stream().reduce((s1, s2) -> s1 + ", " + s2).orElse("")
+                    );
+                    if (subcommandName.isEmpty()) {
+                        subCommand = "";
+                    }
 
-                        LOGGER.info("Command '%s' registered %s ".formatted(command.getName(), subCommand));
-                    });
-                });
+                    LOGGER.info("Command '%s' registered %s ".formatted(command.getName(), subCommand));
+                }));
 
     }
 
@@ -134,8 +144,9 @@ public class CommandManager extends ListenerAdapter {
             event.reply("Command not found").setEphemeral(true).queue();
             return;
         }
+
         SimpleCommand simpleCommand = commandDataMap.get(event.getName());
-        if (event.isFromGuild() && !memberCanExecuteCommand(Objects.requireNonNull(event.getMember()), simpleCommand)) {
+        if (event.isFromGuild() && !memberCanExecuteCommand(event, simpleCommand)) {
             event.reply("You don't have the permission to execute this command").setEphemeral(true).queue();
             return;
         }
@@ -164,7 +175,7 @@ public class CommandManager extends ListenerAdapter {
             return;
         }
         SimpleCommand simpleCommand = commandDataMap.get(event.getName());
-        if (event.isFromGuild() && !memberCanExecuteCommand(Objects.requireNonNull(event.getMember()), simpleCommand)) {
+        if (event.isFromGuild() && !memberCanExecuteCommand(event, simpleCommand)) {
             return;
         }
         String[] command = event.getFullCommandName().split(" ");
@@ -205,40 +216,89 @@ public class CommandManager extends ListenerAdapter {
 
     private Object[] createParamsList(Method method, SlashCommandInteractionEvent event) {
         Object[] params = new Object[method.getParameterCount()];
+
         for (int i = 0; i < method.getParameters().length; i++) {
             Parameter parameter = method.getParameters()[i];
-            if (parameter.isAnnotationPresent(Param.class)) {
-                Param annotation = parameter.getAnnotation(Param.class);
-                OptionMapping option = event.getOption(annotation.name().toLowerCase());
-                if (option == null) {
-                    throw new IllegalArgumentException("Option " + annotation.name() + " not found");
-                }
-                if (providers.containsKey(parameter.getType())) {
-                    ParamProvider<?> paramProvider = providers.get(parameter.getType());
-                    params[i] = paramProvider.get(option, event);
-                } else {
-                    throw new IllegalArgumentException("Impossible to find provider for parameter " + parameter.getName());
-                }
-            } else {
-                if (providers.containsKey(parameter.getType())) {
-                    ParamProvider<?> paramProvider = providers.get(parameter.getType());
-                    if (paramProvider.getOptionType() != OptionType.UNKNOWN) {
-                        throw new IllegalArgumentException("Provider for param %s in method %s is for a discord param"
-                                .formatted(parameter.getType(), parameter.getName()));
-                    }
-                    params[i] = paramProvider.get(null, event);
-                } else {
-                    throw new IllegalArgumentException("Impossible to find provider for parameter " + parameter.getName());
-                }
-            }
 
+            if (parameter.isAnnotationPresent(Param.class)) {
+                params[i] = resolveAnnotatedParameter(parameter, event);
+            } else {
+                params[i] = resolveNonAnnotatedParameter(parameter, event);
+            }
         }
+
         return params;
     }
 
-    private boolean memberCanExecuteCommand(Member member, SimpleCommand simpleCommand) {
+    /**
+     * Resolves a parameter annotated with @Param.
+     *
+     * @param parameter The parameter to resolve.
+     * @param event     The SlashCommandInteractionEvent providing the data.
+     * @return The resolved parameter value.
+     * @throws IllegalArgumentException If the parameter cannot be resolved.
+     */
+    private Object resolveAnnotatedParameter(Parameter parameter, SlashCommandInteractionEvent event) {
+        Param annotation = parameter.getAnnotation(Param.class);
+        OptionMapping option = event.getOption(annotation.name().toLowerCase());
+
+        if (option == null) {
+            throw new IllegalArgumentException("Option " + annotation.name() + " not found");
+        }
+
+        return resolveParameterWithProvider(parameter, option, event);
+    }
+
+    /**
+     * Resolves a parameter without an @Param annotation.
+     *
+     * @param parameter The parameter to resolve.
+     * @param event     The SlashCommandInteractionEvent providing the data.
+     * @return The resolved parameter value.
+     * @throws IllegalArgumentException If the parameter cannot be resolved.
+     */
+    private Object resolveNonAnnotatedParameter(Parameter parameter, SlashCommandInteractionEvent event) {
+        if (!providers.containsKey(parameter.getType())) {
+            throw new IllegalArgumentException("Impossible to find provider for parameter " + parameter.getName());
+        }
+
+        ParamProvider<?> paramProvider = providers.get(parameter.getType());
+
+        if (paramProvider.getOptionType() != OptionType.UNKNOWN) {
+            throw new IllegalArgumentException("Provider for param %s in method %s is for a discord param"
+                    .formatted(parameter.getType(), parameter.getName()));
+        }
+
+        return paramProvider.get(null, event);
+    }
+
+    /**
+     * Resolves a parameter using the corresponding provider.
+     *
+     * @param parameter The parameter to resolve.
+     * @param option    The OptionMapping for the parameter.
+     * @param event     The SlashCommandInteractionEvent providing the data.
+     * @return The resolved parameter value.
+     * @throws IllegalArgumentException If no provider is found for the parameter type.
+     */
+    private Object resolveParameterWithProvider(Parameter parameter, OptionMapping option, SlashCommandInteractionEvent event) {
+        if (!providers.containsKey(parameter.getType())) {
+            throw new IllegalArgumentException("Impossible to find provider for parameter " + parameter.getName());
+        }
+
+        ParamProvider<?> paramProvider = providers.get(parameter.getType());
+        return paramProvider.get(option, event);
+    }
+
+
+    private boolean memberCanExecuteCommand(GenericInteractionCreateEvent member, SimpleCommand simpleCommand) {
         assert member != null;
-        return member.hasPermission(simpleCommand.getPerms());
+        for (Middleware middleware : middlewares) {
+            if (!middleware.handle(member, simpleCommand)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     public Map<String, SimpleCommand> getCommands() {
