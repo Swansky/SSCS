@@ -10,6 +10,7 @@ called by the core system when a command is invoked.
 - ✅ **Supports custom types**
 - ✅ **Supports auto-completion**
 - ✅ **Supports commands with and without arguments**
+- ✅ **Supports middleware for permission management**
 - ❌ **Supports ContextMenu**: *In Progress* ⏳
 - ❌ **Supports annotation for provided param**: *In Progress* ⏳
 - ❌ **Supports auto-completion for built-in param**: *In Progress* ⏳
@@ -271,6 +272,41 @@ public class MyCustomObject {
 @SubCommand(name = "select-object", description = "Select a custom object by ID")
 public void selectCustomObject(SlashCommandInteractionEvent event, @Param(name = "object_id") MyCustomObject selectedObject) {
     // Handle the selected object...
+}
+```
+
+### Middleware
+
+Middleware is a way to intercept the command execution before the command is executed. This can be useful for add more logic for command access, logging, etc.
+
+#### Example
+
+```java
+public class MyMiddleware implements Middleware {
+    @Override
+    public void handle(GenericInteractionCreateEvent event, SimpleCommand simpleCommand) {
+        // do something...
+    }
+}
+```
+
+### Usage Example
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        CommandManager commandManager = CommandManagerBuilder.create()
+                .addCommands(new MyCommand())
+                .addProvider(InstanceToProvide.class, new InstanceProvider())
+                .addMiddleware(new MyMiddleware())
+                .build();
+
+        JDA jda = JDABuilder.createDefault("token")
+                .addEventListeners(commandManager)
+                .build();
+
+        commandManager.registerCommands(jda);
+    }
 }
 ```
 
